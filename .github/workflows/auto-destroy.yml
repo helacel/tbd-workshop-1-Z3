@@ -71,4 +71,4 @@ jobs:
       - name: Terraform destroy
         if: steps.check_bucket.outputs.exists == 'true'
         working-directory: ${{ env.TF_WORKING_DIR }}
-        run: terraform destroy -auto-approve -input=false
+        run: terraform destroy -auto-approve -input=false -var-file=env/project.tfvars
