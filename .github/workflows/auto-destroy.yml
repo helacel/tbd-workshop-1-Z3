@@ -1,22 +1,25 @@
 name: Auto Terraform Destroy
 
 on:
-  # codziennie o 20:00 UTC
+  workflow_dispatch:
   schedule:
     - cron: "0 20 * * *"
-
-  # gdy PR do main zostanie ZAMKNIĘTY (oraz ew. zmergowany)
   pull_request:
     types: [closed]
     branches:
       - master
 
 permissions:
-  contents: read
-  id-token: write
+  contents: read      # potrzebne do actions/checkout
+  id-token: write     # potrzebne do google-github-actions/auth (OIDC)
 
 jobs:
   terraform-destroy:
+    # uruchamiaj job:
+    # - zawsze przy schedule
+    # - przy PR tylko jeśli:
+    #     * został zmergowany
+    #     * tytuł zawiera [CLEANUP]
     if: |
       github.event_name == 'schedule' ||
       (github.event_name == 'pull_request' &&
@@ -27,9 +30,9 @@ jobs:
 
     env:
       TF_WORKING_DIR: .
-      GOOGLE_PROJECT: tbd-2025z-2137
+      GOOGLE_PROJECT: tbd-2025z-2137       # <-- jeśli masz inną nazwę projektu, podmień
       GOOGLE_REGION: europe-west1
-      TF_BACKEND_BUCKET: tbd-2025z-2137-state
+      TF_BACKEND_BUCKET: tbd-2025z-2137-tf-state   # <-- TU WKLEJ NAZWĘ Z env/backend.tfvars
 
     steps:
       - name: Checkout repo
@@ -49,30 +52,29 @@ jobs:
           gcloud config set project $GOOGLE_PROJECT
           gcloud config set compute/region $GOOGLE_REGION
 
-      - name: Check if backend bucket exists
-        id: check_bucket
-        run: |
-          if gsutil ls gs://$TF_BACKEND_BUCKET >/dev/null 2>&1; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-            echo "Backend bucket exists, will run destroy."
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-            echo "Backend bucket does not exist, skipping destroy."
-          fi
-
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.11.0
 
+      # 🔍 NOWY KROK: sprawdzenie, czy backend bucket istnieje
+      - name: Check if backend bucket exists
+        id: check_bucket
+        run: |
+          if gsutil ls gs://$TF_BACKEND_BUCKET >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Backend bucket exists, will run destroy."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Backend bucket does not exist, skipping destroy."
+          fi
 
       - name: Terraform init
         if: steps.check_bucket.outputs.exists == 'true'
         working-directory: ${{ env.TF_WORKING_DIR }}
-        run: terraform init -input=false
+        run: terraform init -input=false -backend-config=env/backend.tfvars
 
       - name: Terraform destroy
         if: steps.check_bucket.outputs.exists == 'true'
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: terraform destroy -auto-approve -input=false
-
