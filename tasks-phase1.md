@@ -192,9 +192,86 @@ Steps:
   1. Create file .github/workflows/auto-destroy.yml
   2. Configure it to authenticate and destroy Terraform resources
   3. Test the trigger (schedule or cleanup-tagged PR)
-     
-***paste workflow YAML here***
 
-***paste screenshot/log snippet confirming the auto-destroy ran***
+```
+name: Auto Terraform Destroy
 
-***write one sentence why scheduling cleanup helps in this workshop***
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 20 * * *"
+  pull_request:
+    types: [closed]
+    branches:
+      - master
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  terraform-destroy:
+    if: |
+      github.event_name == 'schedule' ||
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.merged == true &&
+       contains(github.event.pull_request.title, '[CLEANUP]'))
+
+    runs-on: ubuntu-latest
+
+    env:
+      TF_WORKING_DIR: .
+      GOOGLE_PROJECT: tbd-2025z-2137
+      GOOGLE_REGION: europe-west1
+      TF_BACKEND_BUCKET: tbd-2025z-2137-state
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP (Workload Identity)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER_NAME }}
+          service_account: ${{ secrets.GCP_WORKLOAD_IDENTITY_SA_EMAIL }}
+
+      - name: Set up gcloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure gcloud defaults
+        run: |
+          gcloud config set project $GOOGLE_PROJECT
+          gcloud config set compute/region $GOOGLE_REGION
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.11.0
+
+      - name: Check if backend bucket exists
+        id: check_bucket
+        run: |
+          if gsutil ls gs://$TF_BACKEND_BUCKET >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Backend bucket exists, will run destroy."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Backend bucket does not exist, skipping destroy."
+          fi
+
+      - name: Terraform init
+        if: steps.check_bucket.outputs.exists == 'true'
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init -input=false -backend-config=env/backend.tfvars
+
+      - name: Terraform destroy
+        if: steps.check_bucket.outputs.exists == 'true'
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform destroy -auto-approve -input=false -var-file=env/project.tfvars
+```
+
+po wielu próbach przeszło...
+
+<img width="1647" height="626" alt="image" src="https://github.com/user-attachments/assets/ce3a3265-bd45-47d7-8e0b-eef55c2cdc17" />
+
+Scheduling cleanup gwarantuje, że zasoby utworzone podczas ćwiczeń warsztatowych są regularnie usuwane, co zapobiega niepotrzebnym kosztom i utrzymuje środowisko w porządku.
