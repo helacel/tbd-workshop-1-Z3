@@ -30,7 +30,7 @@ UPDATE! Po unieruchomieniu composera realase przeszedł po 40 sek.:
 .../tbd-workshop-1-Z3$ terraform graph > graph.dot
 .../tbd-workshop-1-Z3$ less graph.dot
 szukamy: /module.dataproc
-
+```
     subgraph "cluster_module.dataproc" {
     label = "module.dataproc"
     fontname = "sans-serif"
@@ -45,7 +45,7 @@ szukamy: /module.dataproc
     "module.dataproc.google_storage_bucket_iam_member.staging_bucket_iam" [label="google_storage_bucket_iam_member.staging_bucket_iam"];
     "module.dataproc.google_storage_bucket_iam_member.temp_bucket_iam" [label="google_storage_bucket_iam_member.temp_bucket_iam"];
   }
-   
+ ```  
 6. Reach YARN UI
    
    Polecenie do ustawienia tunelu SSH:
@@ -77,6 +77,7 @@ http://localhost:8088
 For all the resources of type: `google_artifact_registry`, `google_storage_bucket`, `google_service_networking_connection`
 create a sample usage profiles and add it to the Infracost task in CI/CD pipeline. Usage file [example](https://github.com/infracost/infracost/blob/master/infracost-usage-example.yml) 
 
+```
 version: 0.1
 
 resource_usage:
@@ -109,13 +110,14 @@ resource_usage:
   google_service_networking_connection.private_vpc_connection:
     monthly_ingress_gb: 600
     monthly_egress_gb: 600
+```
       
 <img width="1459" height="1046" alt="image" src="https://github.com/user-attachments/assets/67ebc525-9b39-47a2-9580-d5afc128fb31" />
 
 9. Create a BigQuery dataset and an external table using SQL
 
 Kod:
-
+```
     CREATE SCHEMA IF NOT EXISTS `tbd-2025z-2137.workshop_dataset`
     OPTIONS (
       location = 'europe-west1'
@@ -131,6 +133,7 @@ Kod:
     SELECT *
     FROM `tbd-2025z-2137.workshop_dataset.us_states_orc`
     LIMIT 10;
+```
 
 Wynik:
 
